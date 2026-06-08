@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pinefinders — Inquiry App</title>
+  <meta name="description" content="Paste customer inquiries, extract details, generate quote emails and printable receipts.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <style>
+    :root {
+      --bg: #faf7f2;
+      --panel: #ffffff;
+      --ink: #2a241d;
+      --muted: #8a7e6f;
+      --accent: #8B6914;
+      --accent-light: #C4952A;
+      --accent-soft: #f4ead8;
+      --cream: #F7F3EC;
+      --border: #e0d5c5;
+      --error: #c0392b;
+      --success: #27ae60;
+      --shadow: 0 1px 3px rgba(40,30,15,0.06), 0 4px 12px rgba(40,30,15,0.05);
+      --radius: 10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #14110d;
+        --panel: #1f1b15;
+        --ink: #ede4d2;
+        --muted: #8a7e6f;
+        --accent: #d9a85a;
+        --accent-soft: #2a2218;
+        --border: #3a3228;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); min-height: 100vh; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 20px 24px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .back { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
+    .back:hover { color: var(--accent); }
+    .brand { display: flex; align-items: center; gap: 10px; margin-left: 8px; }
+    .brand img.logo { height: 28px; width: auto; }
+    .brand h1 { font-size: 1rem; font-weight: 700; }
+    .brand small { color: var(--muted); font-weight: 400; font-size: 0.78rem; margin-left: 4px; }
+
+    .tabs {
+      display: flex; gap: 0; margin: 0 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      border: none; background: none;
+      font-family: inherit; font-size: 0.88rem;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .tab:hover { color: var(--ink); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    main { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+    label { display: block; font-weight: 600; font-size: 0.82rem; margin-bottom: 4px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+    textarea, input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 0.9rem;
+      background: var(--panel);
+      color: var(--ink);
+      transition: border-color 0.15s;
+    }
+    textarea:focus, input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    textarea { resize: vertical; min-height: 180px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+    .btn {
+      padding: 10px 22px;
+      border: none; border-radius: var(--radius);
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-light); }
+    .btn-secondary { background: var(--accent-soft); color: var(--accent); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { opacity: 0.9; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .output-box {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      white-space: pre-wrap;
+      font-family: "Courier New", monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      min-height: 120px;
+      position: relative;
+    }
+
+    .copy-btn {
+      position: absolute; top: 8px; right: 8px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: var(--accent); color: #fff; }
+    .copy-btn.copied { background: var(--success); color: #fff; border-color: var(--success); }
+
+    .status { font-size: 0.82rem; margin-top: 4px; min-height: 1.2em; }
+    .status.error { color: var(--error); }
+    .status.success { color: var(--success); }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: var(--accent-soft); color: var(--accent); }
+
+    /* Receipt preview */
+    .receipt-preview {
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 32px;
+      max-width: 210mm;
+      margin: 0 auto;
+      font-size: 12px;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+    .receipt-preview .rp-header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+    .receipt-preview .rp-logo img { height: 36px; }
+    .receipt-preview .rp-business { font-size: 11px; color: #555; line-height: 1.4; }
+    .receipt-preview .rp-business strong { color: #2a241d; font-size: 13px; }
+    .receipt-preview .rp-title { font-size: 22px; font-weight: bold; color: var(--accent); text-align: right; }
+    .receipt-preview hr { border: none; border-top: 1px solid var(--accent); margin: 12px 0; }
+    .receipt-preview table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    .receipt-preview table th { background: var(--accent); color: #fff; padding: 8px 10px; text-align: left; font-size: 11px; }
+    .receipt-preview table td { padding: 8px 10px; border-bottom: 1px solid #e0d5c5; font-size: 11px; }
+    .receipt-preview table tr.total-row td { border-top: 2px solid var(--accent); font-weight: bold; }
+    .receipt-preview .rp-payments { margin: 12px 0; }
+    .receipt-preview .rp-payments td { border: none; padding: 3px 10px; }
+    .receipt-preview .rp-footer { font-size: 10px; color: #888; text-align: center; margin-top: 24px; border-top: 1px solid #e0d5c5; padding-top: 12px; }
+
+    .hidden { display: none !important; }
+
+    .section-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 8px; }
+
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr; }
+      header { padding: 14px 16px; }
+      main { padding: 16px; }
+      .receipt-preview { padding: 16px; }
+      .receipt-preview .rp-header { grid-template-columns: 1fr; text-align: center; }
+      .receipt-preview .rp-title { text-align: center; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .receipt-preview { border: none; padding: 0; max-width: 100%; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="no-print">
+  <a class="back" href="../">&larr; App Suite</a>
+  <div class="brand">
+    <img class="logo" src="../logo.png" alt="Pinefinders" onerror="this.style.display='none'">
+    <h1>Pinefinders <small>Inquiry App</small></h1>
+  </div>
+</header>
+
+<div class="tabs no-print">
+  <button class="tab active" data-tab="quote">Quote</button>
+  <button class="tab" data-tab="receipt">Receipt / Invoice</button>
+</div>
+
+<main>
+  <!-- ============== QUOTE TAB ============== -->
+  <div class="tab-content active" id="tab-quote">
+
+    <div class="card">
+      <h3>📥 1. Paste Inquiry</h3>
+      <label for="inquiryText">Paste the email or form submission</label>
+      <textarea id="inquiryText" placeholder="Paste the customer's enquiry email or Squarespace form submission here..."></textarea>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="extractInquiry()">Extract Details</button>
+      </div>
+      <div id="extractStatus" class="status"></div>
+    </div>
+
+    <div id="quoteForm" class="hidden">
+      <div class="card">
+        <h3>📝 2. Review &amp; Edit</h3>
+        <div class="form-row">
+          <div>
+            <label for="qName">Customer Name</label>
+            <input id="qName" placeholder="e.g. Gary Southwell">
+          </div>
+          <div>
+            <label for="qEmail">Email</label>
+            <input id="qEmail" placeholder="e.g. gary@example.com">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label for="qItem">Item Type</label>
+          <input id="qItem" placeholder="e.g. bookcase, chest of drawers, drawer boxes">
+        </div>
+        <div class="form-row" style="margin-top:10px;">
+          <div>
+            <label for="qMaterial">Material</label>
+            <select id="qMaterial">
+              <option value="new pine">New pine</option>
+              <option value="old pine">Old / reclaimed pine</option>
+              <option value="new pine">New pine (default)</option>
+            </select>
+          </div>
+          <div>
+            <label for="qFinish">Finish</label>
+            <select id="qFinish">
+              <option value="waxed">Waxed</option>
+              <option value="bare wood">Bare wood</option>
+              <option value="painted">Painted</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:10px;">
+          <div>
+            <label for="qHeight">Height (cm)</label>
+            <input id="qHeight" placeholder="e.g. 212">
+          </div>
+          <div>
+            <label for="qWidth">Width (cm)</label>
+            <input id="qWidth" placeholder="e.g. 212">
+          </div>
+          <div>
+            <label for="qDepth">Depth (cm)</label>
+            <input id="qDepth" placeholder="e.g. 36.5">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label for="qFeatures">Key Features</label>
+          <input id="qFeatures" placeholder="e.g. 6 adjustable shelves, flat top">
+        </div>
+        <div class="form-row" style="margin-top:10px;">
+          <div>
+            <label for="qPostcode">Delivery Postcode</label>
+            <input id="qPostcode" placeholder="e.g. PH10 7NA (leave blank to omit)">
+          </div>
+          <div>
+            <label for="qPrice">Price (£, each or total)</label>
+            <input id="qPrice" type="text" inputmode="decimal" placeholder="e.g. 65 per drawer or 620 for the item">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label for="qPriceNote">Price note</label>
+          <input id="qPriceNote" placeholder="e.g. each, per drawer, total — describes what the price covers">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📋 3. Quote Draft</h3>
+        <div style="position:relative;">
+          <button class="copy-btn" onclick="copyQuote()" id="copyQuoteBtn">📋 Copy</button>
+          <div class="output-box" id="quoteOutput">Fill in the fields above and click "Generate Quote"</div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="generateQuote()">Generate Quote</button>
+          <button class="btn btn-secondary" onclick="resetQuote()">Reset</button>
+        </div>
+        <div id="quoteStatus" class="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== RECEIPT TAB ============== -->
+  <div class="tab-content" id="tab-receipt">
+
+    <div class="card">
+      <h3>🧾 Customer Details</h3>
+      <div class="form-row">
+        <div>
+          <label for="rName">Customer Name</label>
+          <input id="rName" placeholder="e.g. Georgina Hall">
+        </div>
+        <div>
+          <label for="rEmail">Email</label>
+          <input id="rEmail" placeholder="e.g. georgina@example.com">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label for="rAddress">Delivery Address</label>
+        <textarea id="rAddress" rows="3" placeholder="West Leigh&#10;The Causeway&#10;Eyam&#10;Hope Valley&#10;S32 5QF" style="min-height:80px;"></textarea>
+      </div>
+      <div class="form-row" style="margin-top:10px;">
+        <div>
+          <label for="rPhone">Phone</label>
+          <input id="rPhone" placeholder="e.g. 07834 185842">
+        </div>
+        <div>
+          <label for="rDate">Date</label>
+          <input id="rDate" type="date">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📦 Item Details</h3>
+      <div style="margin-bottom:10px;">
+        <label for="rItemDesc">Item Description</label>
+        <input id="rItemDesc" placeholder="e.g. Large 4 Drawer 4 Door Reclaimed Pine Dresser Base Cupboard">
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="rStockCode">Stock Code (if applicable)</label>
+          <input id="rStockCode" placeholder="e.g. K5300D">
+        </div>
+        <div>
+          <label for="rVatType">VAT Type</label>
+          <select id="rVatType">
+            <option value="margin">Margin Scheme (antique stock — no VAT)</option>
+            <option value="standard">Standard 20% VAT (made-to-measure / new)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:10px;">
+        <div>
+          <label for="rItemPrice">Item Price (£)</label>
+          <input id="rItemPrice" type="number" step="0.01" placeholder="e.g. 797.00">
+        </div>
+        <div>
+          <label for="rDeliveryPrice">Delivery Price (£)</label>
+          <input id="rDeliveryPrice" type="number" step="0.01" placeholder="e.g. 75.00">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label for="rDeliveryDate">Delivery Date</label>
+        <input id="rDeliveryDate" type="date" placeholder="e.g. 11 June 2026">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>💰 Payments</h3>
+      <div class="form-row">
+        <div>
+          <label for="rDeposit">Deposit (£)</label>
+          <input id="rDeposit" type="number" step="0.01" placeholder="e.g. 350.50 (leave blank if paid in full)">
+        </div>
+        <div>
+          <label for="rBalance">Balance (£)</label>
+          <input id="rBalance" type="number" step="0.01" placeholder="e.g. 350.50 (leave blank if paid in full)">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label>
+          <input type="checkbox" id="rPaidInFull" checked>
+          Paid in full
+        </label>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="generateReceipt()">Preview Receipt</button>
+      <button class="btn btn-success" onclick="printReceipt()">🖨️ Print / Save PDF</button>
+      <button class="btn btn-secondary" onclick="resetReceipt()">Reset</button>
+    </div>
+    <div id="receiptStatus" class="status"></div>
+
+    <div id="receiptPreview" class="hidden" style="margin-top:16px;">
+      <div class="section-label no-print">Receipt Preview</div>
+      <div id="receiptContent"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ── Tab switching ────────────────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Set today's date
+  document.getElementById('rDate').valueAsDate = new Date();
+
+  // ── Extract from pasted inquiry ──────────────────────────────────────
+  function extractInquiry() {
+    const text = document.getElementById('inquiryText').value;
+    const status = document.getElementById('extractStatus');
+    status.className = '';
+
+    if (!text.trim()) {
+      status.textContent = 'Please paste an inquiry first.';
+      status.className = 'status error';
+      return;
+    }
+
+    status.textContent = 'Extracting...';
+    status.className = 'status';
+
+    // Simple extraction based on Squarespace form patterns and free text
+    const extract = {};
+
+    // Name
+    const nameMatch = text.match(/Name[:\s]*([^\n\r]+)/i);
+    if (nameMatch) extract.name = nameMatch[1].trim();
+
+    // Email
+    const emailMatch = text.match(/Email[:\s]*([^\n\r]+)/i) || text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]+)/);
+    if (emailMatch) extract.email = emailMatch[1].trim();
+
+    // Dimensions — handle various formats
+    const hMatch = text.match(/Height[^:]*:\s*(\d+(?:\.\d+)?)/i) || text.match(/Height[^0-9]*(\d+(?:\.\d+)?)\s*cm/i);
+    const wMatch = text.match(/Width[^:]*:\s*(\d+(?:\.\d+)?)/i) || text.match(/Width[^0-9]*(\d+(?:\.\d+)?)\s*cm/i);
+    const dMatch = text.match(/Depth[^:]*:\s*(\d+(?:\.\d+)?)/i) || text.match(/Depth[^0-9]*(\d+(?:\.\d+)?)\s*cm/i);
+    if (hMatch) extract.height = hMatch[1];
+    if (wMatch) extract.width = wMatch[1];
+    if (dMatch) extract.depth = dMatch[1];
+
+    // Postcode
+    const pcMatch = text.match(/([A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2})/i);
+    if (pcMatch) extract.postcode = pcMatch[1].toUpperCase();
+
+    // Finish
+    const finishMatch = text.match(/Waxed, painted or bare wood[?:]*\s*(\w+)/i);
+    if (finishMatch) {
+      const f = finishMatch[1].toLowerCase();
+      if (f.includes('wax')) extract.finish = 'waxed';
+      else if (f.includes('bare') || f.includes('bare wood')) extract.finish = 'bare wood';
+      else if (f.includes('paint') || f.includes('painted')) extract.finish = 'painted';
+    }
+
+    // Item type from subject
+    const subjMatch = text.match(/Form Submission[^-]*- (.*?)(?:inquiry|form)/i);
+    if (subjMatch) {
+      extract.item = subjMatch[1].trim().toLowerCase();
+    } else {
+      // Try to infer from keywords
+      const itemKeywords = [
+        {kw: 'drawer boxes', words: ['drawer boxes', 'drawer box', 'drawers only', 'just the drawers']},
+        {kw: 'chest of drawers', words: ['chest of drawers', 'chest of drawer']},
+        {kw: 'bookcase', words: ['bookcase', 'bookshelf', 'book shelf']},
+        {kw: 'cupboard', words: ['cupboard']},
+        {kw: 'wardrobe', words: ['wardrobe']},
+        {kw: 'dresser', words: ['dresser']},
+        {kw: 'sideboard', words: ['sideboard']},
+        {kw: 'table', words: ['table']},
+        {kw: 'desk', words: ['desk']},
+        {kw: 'cabinet', words: ['cabinet']},
+      ];
+      const lower = text.toLowerCase();
+      for (const item of itemKeywords) {
+        for (const word of item.words) {
+          if (lower.includes(word)) {
+            extract.item = item.kw;
+            break;
+          }
+        }
+        if (extract.item) break;
+      }
+    }
+
+    // Comments / features
+    const commentsMatch = text.match(/Any more information required\/comments[?:]*\s*([^\n\r]+)/i);
+    if (commentsMatch) extract.features = commentsMatch[1].trim();
+
+    // Shelves
+    const shelvesMatch = text.match(/How many shelves inside[?:]*\s*(\d+)/i) || text.match(/(\d+)\s*shelves/i);
+    if (shelvesMatch) {
+      const adj = text.match(/adjustable/i) ? 'adjustable' : '';
+      extract.features = (extract.features || '') + (extract.features ? ', ' : '') + shelvesMatch[1] + ' shelves' + (adj ? ' ' + adj : '');
+    }
+
+    // Drawers
+    const drawersMatch = text.match(/How many drawers[?:]*\s*(\d+)/i);
+    if (drawersMatch) {
+      extract.features = (extract.features || '') + (extract.features ? ', ' : '') + drawersMatch[1] + ' drawers';
+    }
+
+    // Fill the form
+    if (extract.name) document.getElementById('qName').value = extract.name;
+    if (extract.email) document.getElementById('qEmail').value = extract.email;
+    if (extract.item) document.getElementById('qItem').value = extract.item;
+    if (extract.height) document.getElementById('qHeight').value = extract.height;
+    if (extract.width) document.getElementById('qWidth').value = extract.width;
+    if (extract.depth) document.getElementById('qDepth').value = extract.depth;
+    if (extract.postcode) document.getElementById('qPostcode').value = extract.postcode;
+    if (extract.finish) document.getElementById('qFinish').value = extract.finish;
+    if (extract.features) document.getElementById('qFeatures').value = extract.features;
+
+    // Show the form
+    document.getElementById('quoteForm').classList.remove('hidden');
+
+    const found = Object.values(extract).filter(v => v).length;
+    status.textContent = `Extracted ${found} fields. Review and edit below, then click Generate Quote.`;
+    status.className = 'status success';
+  }
+
+  // ── Generate Quote ────────────────────────────────────────────────────
+  function generateQuote() {
+    const get = id => document.getElementById(id).value.trim();
+
+    const time = new Date();
+    const hour = time.getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good afternoon';
+
+    const name = get('qName');
+    const item = get('qItem') || 'made-to-measure pine item';
+    const material = get('qMaterial') || 'new pine';
+    const finish = get('qFinish') || 'wax finished';
+    const height = get('qHeight') || '?HEIGHT?';
+    const width = get('qWidth') || '?WIDTH?';
+    const depth = get('qDepth') || '?DEPTH?';
+    const features = get('qFeatures');
+    const postcode = get('qPostcode');
+    const priceRaw = get('qPrice');
+    const priceNote = get('qPriceNote');
+
+    // Build description sentence
+    let desc = `made-to-measure pine ${item}`;
+    if (material && material !== 'new pine') desc = desc.replace('pine', material + ' pine');
+
+    // Only add features if they're short and meaningful (not the full comments)
+    let featureStr = '';
+    if (features && features.length < 80 && !features.match(/wondering|hoping|please|would be/i)) {
+      featureStr = ', with ' + features.toLowerCase();
+    }
+
+    // Price
+    let priceLine;
+    if (priceRaw) {
+      const net = parseFloat(priceRaw);
+      const inc = net * 1.2;
+      const eachNote = priceNote ? ' ' + priceNote : '';
+      priceLine = `would be £${net.toFixed(2)} + VAT (£${inc.toFixed(2)})${eachNote}.`;
+    } else {
+      priceLine = 'would be £[PRICE] + VAT (£[PRICE INC VAT]).';
+    }
+
+    // Delivery line
+    let deliveryLine = '';
+    if (postcode) {
+      deliveryLine = `\n\nDelivery to ${postcode.toUpperCase()}: £[DELIVERY PRICE]`;
+    }
+
+    // Finish display text
+    let finishDisplay = finish;
+    if (finish === 'waxed') finishDisplay = 'supplied waxed';
+    else if (finish === 'bare wood') finishDisplay = 'supplied in bare wood';
+    else if (finish === 'painted') finishDisplay = 'painted';
+
+    const output = `${greeting}, and thank you for your inquiry.\n\nThe price for ${desc}${featureStr ? ',' + featureStr : ','} ${height}cm high, ${width}cm wide, ${depth}cm deep, ${finishDisplay}, ${priceLine}${deliveryLine}\n\nPlease let me know if you'd like to proceed with the order, or if you have any further questions.\n\nKind regards,\n\nKen`;
+
+    document.getElementById('quoteOutput').textContent = output;
+    document.getElementById('quoteStatus').textContent = 'Quote generated. Review and copy.';
+    document.getElementById('quoteStatus').className = 'status success';
+  }
+
+  // ── Copy Quote ─────────────────────────────────────────────────────────
+  function copyQuote() {
+    const text = document.getElementById('quoteOutput').textContent;
+    if (text === 'Fill in the fields above and click "Generate Quote"') return;
+
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyQuoteBtn');
+      btn.textContent = '✅ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '📋 Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // ── Reset Quote ────────────────────────────────────────────────────────
+  function resetQuote() {
+    document.getElementById('quoteOutput').textContent = 'Fill in the fields above and click "Generate Quote"';
+    document.getElementById('quoteStatus').textContent = '';
+    document.getElementById('quoteStatus').className = 'status';
+  }
+
+  // ── Generate Receipt ───────────────────────────────────────────────────
+  function generateReceipt() {
+    const get = id => document.getElementById(id).value.trim();
+
+    const name = get('rName') || '?CUSTOMER NAME?';
+    const email = get('rEmail');
+    const address = get('rAddress') || '?ADDRESS?';
+    const phone = get('rPhone');
+    const date = get('rDate');
+    const itemDesc = get('rItemDesc') || '?ITEM?';
+    const stockCode = get('rStockCode');
+    const vatType = get('rVatType');
+    const itemPrice = parseFloat(get('rItemPrice')) || 0;
+    const deliveryPrice = parseFloat(get('rDeliveryPrice')) || 0;
+    const deliveryDate = get('rDeliveryDate');
+    const deposit = parseFloat(get('rDeposit')) || 0;
+    const balance = parseFloat(get('rBalance')) || 0;
+    const paidInFull = document.getElementById('rPaidInFull').checked;
+
+    const totalPaid = itemPrice + deliveryPrice;
+
+    // Build receipt HTML
+    let html = '<div class="receipt-preview" id="receiptPrintArea">';
+
+    // Header
+    const formattedDate = date ? new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    html += '<div class="rp-header">';
+    html += '<div class="rp-logo"><img src="../logo.png" alt="Pinefinders" style="height:36px;" onerror="this.style.display=\'none\'"></div>';
+    html += '<div class="rp-business"><strong>Pinefinders</strong><br>Specialists in Restored Antique Pine<br>Unit 7 Alexander House<br>Thame Rd Industrial Estate, Thame Rd<br>Haddenham, Aylesbury HP17 8BY<br>Tel: 01844 291231 | Mob: 07956 862934<br>Email: ken@pinefinders.co.uk | Web: www.pinefinders.co.uk</div>';
+    html += '<div class="rp-title">RECEIPT</div>';
+    html += '</div>';
+    html += '<hr>';
+
+    // Customer + date
+    html += '<table style="border:none;margin:0;"><tr style="vertical-align:top;">';
+    html += '<td style="border:none;width:60%;"><strong>Bill To:</strong><br>' + name.replace(/\n/g, '<br>');
+    const addrLines = address.split('\n');
+    addrLines.forEach(line => { html += '<br>' + line; });
+    if (email) html += '<br>' + email;
+    if (phone) html += '<br>' + phone;
+    html += '</td>';
+    html += '<td style="border:none;text-align:right;"><strong>Date:</strong> ' + (formattedDate || '?DATE?') + '</td>';
+    html += '</tr></table>';
+
+    // Items table
+    html += '<table>';
+    html += '<tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr>';
+
+    const vatLabel = (vatType === 'margin') ? '' : ' + VAT';
+    const priceDisplay = itemPrice > 0 ? `£${itemPrice.toFixed(2)}${vatLabel}` : '£?PRICE?';
+    const totalDisplay = itemPrice > 0 ? `£${itemPrice.toFixed(2)}` : '£?TOTAL?';
+
+    let descDisplay = itemDesc;
+    if (stockCode) descDisplay += '<br><span style="font-size:9px;color:#888;">Code: ' + stockCode + '</span>';
+
+    html += '<tr><td>' + descDisplay + '</td><td style="text-align:center;">1</td><td style="text-align:right;">' + priceDisplay + '</td><td style="text-align:right;">' + totalDisplay + '</td></tr>';
+
+    if (deliveryPrice > 0) {
+      html += '<tr><td><strong>Delivery</strong></td><td style="text-align:center;">1</td><td style="text-align:right;">' + `£${deliveryPrice.toFixed(2)}${vatLabel}` + '</td><td style="text-align:right;">' + `£${deliveryPrice.toFixed(2)}` + '</td></tr>';
+    }
+
+    // Totals
+    html += '<tr><td colspan="3" style="border:none;"></td><td style="border:none;"></td></tr>';
+    html += '<tr class="total-row"><td colspan="3" style="text-align:right;"><strong>Total Paid:</strong></td><td style="text-align:right;"><strong>' + (totalPaid > 0 ? `£${totalPaid.toFixed(2)}` : '£?TOTAL?') + '</strong></td></tr>';
+    html += '</table>';
+
+    // Payments
+    const hasDeposit = deposit > 0;
+    const hasBalance = balance > 0;
+    if (hasDeposit || hasBalance || paidInFull) {
+      html += '<div class="rp-payments">';
+      html += '<table style="width:auto;margin-left:auto;">';
+      html += '<tr><td style="border:none;padding:3px 10px;"><strong>Payments Received</strong></td><td style="border:none;"></td></tr>';
+      if (hasDeposit) html += '<tr><td style="border:none;padding:3px 10px;">Deposit</td><td style="border:none;text-align:right;">' + `£${deposit.toFixed(2)}` + '</td></tr>';
+      if (hasBalance) html += '<tr><td style="border:none;padding:3px 10px;">Final balance</td><td style="border:none;text-align:right;">' + `£${balance.toFixed(2)}` + '</td></tr>';
+      if (!hasDeposit && !hasBalance && paidInFull) html += '<tr><td style="border:none;padding:3px 10px;">Full payment</td><td style="border:none;text-align:right;">' + (totalPaid > 0 ? `£${totalPaid.toFixed(2)}` : '£?AMOUNT?') + '</td></tr>';
+      html += '</table>';
+      html += '</div>';
+    }
+
+    if (paidInFull) {
+      html += '<p style="font-weight:bold;margin:8px 0;">Paid in full.</p>';
+    }
+
+    // VAT notes
+    if (vatType === 'margin') {
+      html += '<hr style="margin:8px 0;">';
+      html += '<p style="font-size:10px;color:#666;">• This item is sold under the Second-hand Margin Scheme. No VAT is charged or shown.</p>';
+    }
+
+    // Delivery date
+    if (deliveryDate) {
+      const delDate = new Date(deliveryDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      html += '<p style="font-size:10px;color:#666;margin-top:8px;"><strong>Delivery date:</strong> ' + delDate + '</p>';
+    }
+
+    // Footer
+    html += '<div class="rp-footer">Pinefinders | Unit 7 Alexander House, Thame Rd Industrial Estate, Thame Rd, Haddenham, Aylesbury HP17 8BY | Tel: 01844 291231 | ken@pinefinders.co.uk</div>';
+
+    html += '</div>';
+
+    document.getElementById('receiptContent').innerHTML = html;
+    document.getElementById('receiptPreview').classList.remove('hidden');
+    document.getElementById('receiptStatus').textContent = 'Receipt preview ready.';
+    document.getElementById('receiptStatus').className = 'status success';
+  }
+
+  // ── Print Receipt ────────────────────────────────────────────────────
+  function printReceipt() {
+    generateReceipt();
+    setTimeout(() => {
+      window.print();
+    }, 200);
+  }
+
+  // ── Reset Receipt ────────────────────────────────────────────────────
+  function resetReceipt() {
+    document.getElementById('receiptPreview').classList.add('hidden');
+    document.getElementById('receiptStatus').textContent = '';
+    document.getElementById('receiptStatus').className = 'status';
+  }
+</script>
+
+</body>
+</html>
